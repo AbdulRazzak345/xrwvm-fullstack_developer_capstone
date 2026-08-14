@@ -12,8 +12,18 @@ SECRET_KEY = 'django-insecure-change-this-in-production'
 DEBUG = True
 
 
-# Updated to allow local development server
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
+# Updated to allow local development server and Skills Network proxy
+ALLOWED_HOSTS = [
+    '127.0.0.1',
+    'localhost',
+    'abdulrazzakb-8000.theiadockernext-0-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai',
+]
+
+
+# Allow CSRF requests from the Skills Network proxy
+CSRF_TRUSTED_ORIGINS = [
+    'https://abdulrazzakb-8000.theiadockernext-0-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai',
+]
 
 
 # Application definition

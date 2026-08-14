@@ -6,6 +6,9 @@ from django.views.decorators.csrf import csrf_exempt
 import json
 import logging
 
+from .models import CarMake, CarModel
+from .populate import initiate
+
 logger = logging.getLogger(__name__)
 
 
@@ -103,3 +106,26 @@ def registration(request):
         }
 
         return JsonResponse(data)
+
+
+def get_cars(request):
+    count = CarMake.objects.all().count()
+
+    print(count)
+
+    if count == 0:
+        initiate()
+
+    car_models = CarModel.objects.select_related("make")
+
+    cars = []
+
+    for car_model in car_models:
+        cars.append({
+            "CarModel": car_model.name,
+            "CarMake": car_model.make.name
+        })
+
+    return JsonResponse({
+        "CarModels": cars
+    })
