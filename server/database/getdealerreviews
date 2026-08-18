@@ -1,0 +1,2 @@
+curl -X GET "https://abdulrazzakb-3030.theiadockernext-1-labs-prod-theiak8s-4-tor01.proxy.cognitiveclass.ai/fetchReviews/dealer/29"
+[{"_id":"6a842903aab1ad9ef3a7f83b","id":3,"name":"Lion Reames","dealership":29,"review":"Expanded global groupware","purchase":true,"purchase_date":"10/20/2020","car_make":"Mazda","car_model":"MX-5","car_year":2003,"__v":0}]
