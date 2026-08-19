@@ -40,7 +40,7 @@ urlpatterns = [
     ),
 
     path(
-        route='get_dealer/<int:dealer_id>',
+        route='dealer/<int:dealer_id>',
         view=views.get_dealer_details,
         name='dealer_details'
     ),
