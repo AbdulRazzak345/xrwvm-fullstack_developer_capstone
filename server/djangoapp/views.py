@@ -3,82 +3,101 @@ from django.http import JsonResponse
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import User
 from django.views.decorators.csrf import csrf_exempt
+
 import json
 import logging
 
 from .models import CarMake, CarModel
 from .populate import initiate
-from .restapis import get_request, analyze_review_sentiments, post_review
 
 logger = logging.getLogger(__name__)
 
 
+# ============================================================
+# LOGIN
+# ============================================================
+
 @csrf_exempt
 def login_user(request):
     if request.method == "POST":
+
+        try:
+            data = json.loads(request.body)
+
+            username = data["userName"]
+            password = data["password"]
+
+            user = authenticate(
+                username=username,
+                password=password
+            )
+
+            if user is not None:
+                login(request, user)
+
+                return JsonResponse({
+                    "userName": username,
+                    "status": "Authenticated"
+                })
+
+            return JsonResponse({
+                "userName": username,
+                "error": "Invalid credentials"
+            })
+
+        except Exception as e:
+            logger.exception("Login error")
+
+            return JsonResponse({
+                "error": str(e)
+            }, status=400)
+
+    return JsonResponse({
+        "error": "POST request required"
+    }, status=400)
+
+
+# ============================================================
+# LOGOUT
+# ============================================================
+
+def logout_request(request):
+
+    logout(request)
+
+    return JsonResponse({
+        "userName": ""
+    })
+
+
+# ============================================================
+# REGISTRATION
+# ============================================================
+
+@csrf_exempt
+def registration(request):
+
+    if request.method != "POST":
+        return JsonResponse({
+            "error": "POST request required"
+        }, status=400)
+
+    try:
         data = json.loads(request.body)
 
         username = data["userName"]
         password = data["password"]
+        first_name = data["firstName"]
+        last_name = data["lastName"]
+        email = data["email"]
 
-        user = authenticate(username=username, password=password)
+        # Check if username already exists
+        if User.objects.filter(username=username).exists():
 
-        if user is not None:
-            login(request, user)
-
-            data = {
+            return JsonResponse({
                 "userName": username,
-                "status": "Authenticated"
-            }
-
-            return JsonResponse(data)
-
-        else:
-            data = {
-                "userName": username,
-                "error": "Invalid credentials"
-            }
-
-            return JsonResponse(data)
-
-    return JsonResponse({"error": "POST request required"})
-
-
-def logout_request(request):
-    logout(request)
-
-    data = {
-        "userName": ""
-    }
-
-    return JsonResponse(data)
-
-
-@csrf_exempt
-def registration(request):
-    context = {}
-
-    # Load JSON data from request body
-    data = json.loads(request.body)
-
-    username = data["userName"]
-    password = data["password"]
-    first_name = data["firstName"]
-    last_name = data["lastName"]
-    email = data["email"]
-
-    username_exist = False
-
-    try:
-        # Check if user already exists
-        User.objects.get(username=username)
-        username_exist = True
-
-    except User.DoesNotExist:
-        logger.debug("{} is new user".format(username))
-
-    # If it is a new user
-    if not username_exist:
+                "error": "Already Registered"
+            })
 
         # Create user
         user = User.objects.create_user(
@@ -89,30 +108,30 @@ def registration(request):
             email=email
         )
 
-        # Login the user
+        # Login immediately
         login(request, user)
 
-        data = {
+        return JsonResponse({
             "userName": username,
             "status": "Authenticated"
-        }
+        })
 
-        return JsonResponse(data)
+    except Exception as e:
 
-    else:
+        logger.exception("Registration error")
 
-        data = {
-            "userName": username,
-            "error": "Already Registered"
-        }
+        return JsonResponse({
+            "error": str(e)
+        }, status=400)
 
-        return JsonResponse(data)
 
+# ============================================================
+# GET CAR MAKES AND MODELS
+# ============================================================
 
 def get_cars(request):
-    count = CarMake.objects.all().count()
 
-    print(count)
+    count = CarMake.objects.all().count()
 
     if count == 0:
         initiate()
@@ -122,6 +141,7 @@ def get_cars(request):
     cars = []
 
     for car_model in car_models:
+
         cars.append({
             "CarModel": car_model.name,
             "CarMake": car_model.make.name
@@ -132,9 +152,12 @@ def get_cars(request):
     })
 
 
-# Update the get_dealerships render list of dealerships
-# all by default, particular state if state is passed
+# ============================================================
+# GET ALL DEALERSHIPS / DEALERS BY STATE
+# ============================================================
+
 def get_dealerships(request, state="All"):
+
     if state == "All":
         endpoint = "/fetchDealers"
     else:
@@ -148,68 +171,151 @@ def get_dealerships(request, state="All"):
     })
 
 
-# Get details of a particular dealer
+# ============================================================
+# GET SINGLE DEALER
+# ============================================================
+
 def get_dealer_details(request, dealer_id):
+
     if dealer_id:
+
         endpoint = "/fetchDealer/" + str(dealer_id)
+
         dealer = get_request(endpoint)
 
         return JsonResponse({
             "status": 200,
             "dealer": dealer
         })
-    else:
-        return JsonResponse({
-            "status": 400,
-            "message": "Bad Request"
-        })
+
+    return JsonResponse({
+        "status": 400,
+        "message": "Bad Request"
+    }, status=400)
 
 
-# Get reviews of a particular dealer and analyze sentiments
+# ============================================================
+# GET DEALER REVIEWS
+# ============================================================
+
 def get_dealer_reviews(request, dealer_id):
-    # if dealer id has been provided
-    if dealer_id:
-        endpoint = "/fetchReviews/dealer/" + str(dealer_id)
-        reviews = get_request(endpoint)
 
-        for review_detail in reviews:
-            response = analyze_review_sentiments(review_detail["review"])
-            print(response)
-            review_detail["sentiment"] = response["sentiment"]
+    if not dealer_id:
 
-        return JsonResponse({
-            "status": 200,
-            "reviews": reviews
-        })
-    else:
         return JsonResponse({
             "status": 400,
             "message": "Bad Request"
-        })
+        }, status=400)
 
+    endpoint = "/fetchReviews/dealer/" + str(dealer_id)
 
-# Add a review
-def add_review(request):
-    if request.user.is_anonymous == False:
-        data = json.loads(request.body)
+    reviews = get_request(endpoint)
+
+    # Make sure reviews is a list
+    if reviews is None:
+        reviews = []
+
+    # Analyze sentiment for each review
+    for review_detail in reviews:
 
         try:
-            response = post_review(data)
-            print(response)
+
+            response = analyze_review_sentiments(
+                review_detail.get("review", "")
+            )
+
+            print("Sentiment response:", response)
+
+            # IMPORTANT:
+            # The sentiment service may be unavailable.
+            # Do not crash the entire endpoint.
+
+            if response and isinstance(response, dict):
+
+                review_detail["sentiment"] = response.get(
+                    "sentiment",
+                    "unknown"
+                )
+
+            else:
+
+                review_detail["sentiment"] = "unknown"
+
+        except Exception as e:
+
+            logger.exception(
+                "Sentiment analysis failed"
+            )
+
+            review_detail["sentiment"] = "unknown"
+
+    return JsonResponse({
+        "status": 200,
+        "reviews": reviews
+    })
+
+
+# ============================================================
+# ADD REVIEW
+# ============================================================
+
+@csrf_exempt
+def add_review(request):
+
+    print("========== ADD REVIEW ==========")
+    print("User:", request.user)
+    print(
+        "Authenticated:",
+        request.user.is_authenticated
+    )
+
+    if request.method != "POST":
+
+        return JsonResponse({
+            "status": 400,
+            "message": "POST request required"
+        }, status=400)
+
+    # User must be logged in
+    if request.user.is_anonymous:
+
+        return JsonResponse({
+            "status": 403,
+            "message": "Unauthorized"
+        }, status=403)
+
+    try:
+
+        data = json.loads(request.body)
+
+        print("Review data:")
+        print(data)
+
+        response = post_review(data)
+
+        print("post_review response:")
+        print(response)
+
+        if response:
 
             return JsonResponse({
                 "status": 200,
                 "message": "Review posted successfully"
             })
 
-        except:
-            return JsonResponse({
-                "status": 401,
-                "message": "Error in posting review"
-            })
-
-    else:
         return JsonResponse({
-            "status": 403,
-            "message": "Unauthorized"
-        })
+            "status": 500,
+            "message": "Unable to post review"
+        }, status=500)
+
+    except Exception as e:
+
+        logger.exception(
+            "Error in posting review"
+        )
+
+        return JsonResponse({
+            "status": 500,
+            "message": "Error in posting review",
+            "error": str(e)
+        }, status=500)

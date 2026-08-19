@@ -1,60 +1,148 @@
-# Uncomment the imports below before you add the function code
 import requests
-import os
-from dotenv import load_dotenv
+import logging
 
-load_dotenv()
-
-backend_url = os.getenv(
-    'backend_url', default="http://localhost:3030"
-)
-
-sentiment_analyzer_url = os.getenv(
-    'sentiment_analyzer_url',
-    default="http://localhost:5050/"
-)
+logger = logging.getLogger(__name__)
 
 
-def get_request(endpoint, **kwargs):
-    params = ""
+# ============================================================
+# BASE URLS
+# ============================================================
 
-    if kwargs:
-        for key, value in kwargs.items():
-            params = params + key + "=" + value + "&"
+NODE_SERVER = "http://localhost:3030"
+SENTIMENT_SERVER = "http://localhost:5050"
 
-    request_url = backend_url + endpoint + "?" + params
 
-    print("GET from {} ".format(request_url))
+# ============================================================
+# GENERIC GET REQUEST
+# ============================================================
+
+def get_request(endpoint):
+
+    url = NODE_SERVER + endpoint
+
+    print("GET from", url, "?")
 
     try:
-        # Call get method of requests library with URL and parameters
-        response = requests.get(request_url)
+
+        response = requests.get(
+            url,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
         return response.json()
-    except:
-        # If any error occurs
-        print("Network exception occurred")
+
+    except requests.exceptions.RequestException as e:
+
+        print("Network exception occurred:", e)
+
+        return None
+
+    except Exception as e:
+
+        print("Exception occurred:", e)
+
+        return None
 
 
-def analyze_review_sentiments(text):
-    request_url = sentiment_analyzer_url + "analyze/" + text
+# ============================================================
+# SENTIMENT ANALYSIS
+# ============================================================
 
-    print("GET from {} ".format(request_url))
+def analyze_review_sentiments(review):
+
+    url = SENTIMENT_SERVER + "/analyze/" + review
+
+    print(
+        "GET from",
+        url,
+        "?"
+    )
 
     try:
-        response = requests.get(request_url)
-        return response.json()
-    except:
-        print("Network exception occurred")
+
+        response = requests.get(
+            url,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        print(
+            "Sentiment analyzer response:",
+            result
+        )
+
+        return result
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            "Network exception occurred:",
+            e
+        )
+
+        return None
+
+    except Exception as e:
+
+        print(
+            "Sentiment analysis exception:",
+            e
+        )
+
+        return None
 
 
-def post_review(data_dict):
-    request_url = backend_url + "/insert_review"
+# ============================================================
+# POST REVIEW
+# ============================================================
 
-    print("POST to {} ".format(request_url))
+def post_review(data):
+
+    url = NODE_SERVER + "/insert_review"
+
+    print("POST to", url)
+
+    print(data)
 
     try:
-        response = requests.post(request_url, json=data_dict)
-        print(response.json())
-        return response.json()
-    except:
-        print("Network exception occurred")
+
+        response = requests.post(
+            url,
+            json=data,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        print(
+            "post_review response:"
+        )
+
+        print(result)
+
+        return result
+
+    except requests.exceptions.RequestException as e:
+
+        print(
+            "Network exception occurred:",
+            e
+        )
+
+        return None
+
+    except Exception as e:
+
+        print(
+            "Post review exception:",
+            e
+        )
+
+        return None
